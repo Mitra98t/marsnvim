@@ -1,9 +1,11 @@
+use argparse::{ArgumentParser, StoreTrue};
 use colored::Colorize;
 use inquire::Confirm;
 use inquire::Select;
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, process::exit, str};
 
 #[derive(Debug)]
@@ -207,11 +209,61 @@ fn print_line_number_style_example() {
 }
 
 fn main() {
+    let mut installation = false;
+    let mut update = false;
+    let mut uninstall = false;
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Marsnvim installer.");
+        ap.refer(&mut installation).add_option(
+            &["-i", "--install"],
+            StoreTrue,
+            "Start Marsnvim installation process",
+        );
+        ap.refer(&mut update).add_option(
+            &["-u", "--update"],
+            StoreTrue,
+            "Start Marsnvim update process",
+        );
+        ap.refer(&mut uninstall).add_option(
+            &["--uninstall"],
+            StoreTrue,
+            "Start Marsnvim uninstall process",
+        );
+        ap.parse_args_or_exit();
+    }
+
+    if (installation || update || uninstall) == false {
+        println!(
+            "Missing action, exiting...\nUse {} to get more informations.",
+            "--help".cyan()
+        );
+        exit(65);
+    }
+
+    if installation {
+        start_installation();
+    } else if update {
+        start_update();
+    } else if uninstall {
+        start_uninstall();
+    }
+}
+
+fn start_update() {
+    todo!("Updating procedure");
+}
+
+fn start_uninstall() {
+    todo!("Uninstalling procedure");
+}
+
+fn start_installation() {
     clear_screen();
 
     let mut settings: CustomSettings = CustomSettings::new();
 
-    let req_list: Vec<&str> = vec!["nvim", "fzf", "git", "lazygit", "fd", "rg"];
+    let req_list: Vec<&str> = vec!["nvim", "fzf", "git", "lazygit", "fd", "rg", "node"];
     let mut requirements: Requirements = Requirements::new(req_list);
 
     requirements.check_all_installed();
@@ -240,57 +292,7 @@ fn main() {
         Err(_) => panic!("Some error occurred!"),
     }
 
-    // FIX: Make backup work
-    //
-    // let home = env::var("HOME").expect("Failed retriving HOME path");
-    // let mut nvim = home.clone();
-    // nvim.push_str("/.config/nvim}");
-    // let mut nvim_bak = home.clone();
-    // nvim_bak.push_str("/.config/nvim.bak}");
-    //
-    // Command::new("mv")
-    //     .args(&[nvim, nvim_bak])
-    //     .output()
-    //     .expect("Some error backing up nvim");
-    //
-    // println!("{} = old nvim configuration backed up!", "OK".green());
-    //
-    // println!("\n-----------------------\n");
-    //
-    // let bak_stuff_ans = Confirm::new("Backup plugins and other installed stuff by nvim?")
-    //     .with_default(false)
-    //     .prompt();
-    //
-    // match bak_stuff_ans {
-    //     Ok(true) => {
-    //         let mut share = home.clone();
-    //         share.push_str("/.local/share/nvim");
-    //         let mut share_bak = home.clone();
-    //         share_bak.push_str("/.local/share/nvim.bak");
-    //         let mut state = home.clone();
-    //         state.push_str("/.local/state/nvim");
-    //         let mut state_bak = home.clone();
-    //         state_bak.push_str("/.local/state/nvim.bak");
-    //         let mut cache = home.clone();
-    //         cache.push_str("/.cache/nvim");
-    //         let mut cache_bak = home.clone();
-    //         cache_bak.push_str("/.cache/nvim.bak");
-    //         Command::new("mv")
-    //             .args(&[share, share_bak])
-    //             .output()
-    //             .expect("Some error backing up nvim");
-    //         Command::new("mv")
-    //             .args(&[state, state_bak])
-    //             .output()
-    //             .expect("Some error backing up nvim");
-    //         Command::new("mv")
-    //             .args(&[cache, cache_bak])
-    //             .output()
-    //             .expect("Some error backing up nvim");
-    //     }
-    //     Ok(false) => {}
-    //     Err(_) => panic!("Some error occurred!"),
-    // }
+    // TODO: Add backup of old nvim configuration
 
     println!("\n-----------------------\n");
 
@@ -386,6 +388,27 @@ fn main() {
 
     println!("\n-----------------------\n");
 
+    let backup_options = vec!["Config", "Complete", "Skip"];
+    let backup_ans = Select::new("Select old config backup mode", backup_options).prompt();
+
+    match backup_ans {
+        Ok(choice) => match choice {
+            "Config" => {
+                back_up_config(false);
+            }
+            "Complete" => {
+                back_up_config(true);
+            }
+            "Skip" => {
+                println!("Skipping backup phase.")
+            }
+            _ => exit(64),
+        },
+        Err(_) => panic!("Some error occurred!"),
+    }
+
+    println!("\n-----------------------\n");
+
     let start_installation_ans = Confirm::new("Procede with cloning and customizing?")
         .with_default(true)
         .prompt();
@@ -401,6 +424,49 @@ fn main() {
         }
         Err(_) => panic!("Some error occurred!"),
     }
+}
+
+fn back_up_config(is_complete: bool) {
+    let since_epoch = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Millennium bug?");
+    let ms = since_epoch.as_millis().to_string();
+    let home = env::var("HOME").expect("Failed retriving HOME path");
+
+    let mut config_path = home.clone();
+    config_path.push_str("/.config/nvim");
+    let mut config_path_bak = config_path.clone();
+    config_path_bak.push_str(ms.as_str());
+    config_path_bak.push_str(".bak");
+    fs::rename(config_path, config_path_bak).expect("Some error during backup.");
+
+    if !is_complete {
+        println!("{} = Backing up done!", "OK".green());
+        return;
+    }
+
+    let mut share_path = home.clone();
+    share_path.push_str("/.local/share/nvim");
+    let mut share_path_bak = share_path.clone();
+    share_path_bak.push_str(ms.as_str());
+    share_path_bak.push_str(".bak");
+    fs::rename(share_path, share_path_bak).expect("Some error during backup.");
+
+    let mut state_path = home.clone();
+    state_path.push_str("/.local/state/nvim");
+    let mut state_path_bak = state_path.clone();
+    state_path_bak.push_str(ms.as_str());
+    state_path_bak.push_str(".bak");
+    fs::rename(state_path, state_path_bak).expect("Some error during backup.");
+
+    let mut cache_path = home.clone();
+    cache_path.push_str("/.cache/nvim");
+    let mut cache_path_bak = cache_path.clone();
+    cache_path_bak.push_str(ms.as_str());
+    cache_path_bak.push_str(".bak");
+    fs::rename(cache_path, cache_path_bak).expect("Some error during backup.");
+
+    println!("{} = Complete back up done!", "OK".green());
 }
 
 /// Starts the installation process
@@ -435,7 +501,7 @@ fn run_installation(is_local: bool, is_ssh: bool, settings: CustomSettings) {
         println!("{} = repository completely local!", "OK".green());
     }
 
-    path_dir_local_config.push_str("/lua/marsnvim/localConfig");
+    path_dir_local_config.push_str("/lua/marsnvim/localconfig");
     create_directory(&path_dir_local_config.clone()[..]);
 
     let mut path_file_init = path_dir_local_config.clone();
