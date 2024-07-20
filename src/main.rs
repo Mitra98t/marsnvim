@@ -4,6 +4,7 @@ use inquire::Confirm;
 use inquire::Select;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, process::exit, str};
@@ -258,6 +259,7 @@ fn start_uninstall() {
     todo!("Uninstalling procedure");
 }
 
+/// Start installation routine
 fn start_installation() {
     clear_screen();
 
@@ -426,6 +428,9 @@ fn start_installation() {
     }
 }
 
+/// Backup old configuration files
+///
+/// * `is_complete`: true if backup everything related to nvim
 fn back_up_config(is_complete: bool) {
     let since_epoch = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -438,7 +443,9 @@ fn back_up_config(is_complete: bool) {
     let mut config_path_bak = config_path.clone();
     config_path_bak.push_str(ms.as_str());
     config_path_bak.push_str(".bak");
-    fs::rename(config_path, config_path_bak).expect("Some error during backup.");
+    if Path::new(&config_path.clone()).exists() {
+        fs::rename(config_path, config_path_bak).expect("Some error during backup.");
+    }
 
     if !is_complete {
         println!("{} = Backing up done!", "OK".green());
@@ -450,21 +457,27 @@ fn back_up_config(is_complete: bool) {
     let mut share_path_bak = share_path.clone();
     share_path_bak.push_str(ms.as_str());
     share_path_bak.push_str(".bak");
-    fs::rename(share_path, share_path_bak).expect("Some error during backup.");
+    if Path::new(&share_path.clone()).exists() {
+        fs::rename(share_path, share_path_bak).expect("Some error during backup.");
+    }
 
     let mut state_path = home.clone();
     state_path.push_str("/.local/state/nvim");
     let mut state_path_bak = state_path.clone();
     state_path_bak.push_str(ms.as_str());
     state_path_bak.push_str(".bak");
-    fs::rename(state_path, state_path_bak).expect("Some error during backup.");
+    if Path::new(&state_path.clone()).exists() {
+        fs::rename(state_path, state_path_bak).expect("Some error during backup.");
+    }
 
     let mut cache_path = home.clone();
     cache_path.push_str("/.cache/nvim");
     let mut cache_path_bak = cache_path.clone();
     cache_path_bak.push_str(ms.as_str());
     cache_path_bak.push_str(".bak");
-    fs::rename(cache_path, cache_path_bak).expect("Some error during backup.");
+    if Path::new(&cache_path.clone()).exists() {
+        fs::rename(cache_path, cache_path_bak).expect("Some error during backup.");
+    }
 
     println!("{} = Complete back up done!", "OK".green());
 }
