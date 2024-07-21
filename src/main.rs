@@ -402,6 +402,21 @@ fn start_installation() {
             id: "gruvbox".to_owned(),
             install_link: "ellisonleao/gruvbox.nvim".to_owned(),
         },
+        Colorscheme {
+            name: "kanagawa".to_owned(),
+            id: "kanagawa-wave".to_owned(),
+            install_link: "rebelot/kanagawa.nvim".to_owned(),
+        },
+        Colorscheme {
+            name: "catppuccin".to_owned(),
+            id: "catppuccin-macchiato".to_owned(),
+            install_link: "catppuccin/nvim".to_owned(),
+        },
+        Colorscheme {
+            name: "ayu mirage".to_owned(),
+            id: "ayu-mirage".to_owned(),
+            install_link: "Shatur/neovim-ayu".to_owned(),
+        },
     ];
     let colorscheme_ans = Select::new(
         "Select a colorscheme",
