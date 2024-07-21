@@ -153,9 +153,7 @@ impl Requirements {
                         self.set_req(program.base_name.clone().as_str(), true);
                         return;
                     }
-                    Err(_) => {
-                        panic!("Some error checking requirements");
-                    }
+                    Err(_) => {}
                 }
             }
             self.set_req(program.base_name.clone().as_str(), false);
