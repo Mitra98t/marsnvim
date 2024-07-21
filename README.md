@@ -3,7 +3,7 @@
 My first ever configuration of nvim!!
 
 > [!TIP]
-> Please if you encounter any errors create an issue, i'll do my best to help
+> If you encounter any errors please create an issue, I'll do my best to help
 > troubleshooting and solving :)
 
 ---
@@ -33,6 +33,11 @@ My first ever configuration of nvim!!
 ### Locally building the installer
 
 Ensure you have a rust environment ready and `cargo` installed.
+
+> [!TIP]
+> Building the installer from source always gives the latest updates.
+> It is also possible to build from source downloading the release files.
+> This is useful for getting a specific version.
 
 1. Clone the installer source code `git clone --branch installer https://github.com/Mitra98t/marsnvim.git marsnvim-installer`
 2. Enter the directory `cd marsnvim-installer`
@@ -77,7 +82,7 @@ nvim
             └── marsnvim plugins
 ```
 
-All the `localconfig` folder can be customized at will.
+All the directories and files inside `localconfig` can be customized at will.
 
 ### 🖋️ Adding and customizing plugins
 
@@ -111,7 +116,7 @@ Inside the `localconfig` directory there is the `core` directory with the
 
 Options like `relativenumber` will go there.
 
-To add file (eg: `keymaps.lua`) simply add the file inside the `core` directory
+To add a file (eg: `keymaps.lua`) simply add the file inside the `core` directory
 and add the following line to the `localconfig/core/init.lua` file:
 
 ```lua
