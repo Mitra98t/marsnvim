@@ -17,7 +17,7 @@ My first ever configuration of nvim!!
 
 ## 📦 Installation
 
-1. Download the most recent installer [here](https://github.com/Mitra98t/marsnvim/releases)
+1. Download or build locally the most recent installer [here](https://github.com/Mitra98t/marsnvim/releases)
 2. Run the installer and follow the steps
 3. Run `nvim`
 
@@ -29,6 +29,14 @@ My first ever configuration of nvim!!
 >   aspect.
 > - The **default** installation keeps the `.git` directory and `.gitignore`
 >   file. Updating the repository will install the updates!
+
+### Locally building the installer
+
+Ensure you have a rust environment ready and `cargo` installed.
+
+1. Clone the installer source code `git clone --branch installer https://github.com/Mitra98t/marsnvim.git marsnvim-installer`
+2. Enter the directory `cd marsnvim-installer`
+3. Run the installer `cargo run -- --installer`
 
 ### 🚨 Troubleshooting
 
