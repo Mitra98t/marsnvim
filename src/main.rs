@@ -3,11 +3,14 @@ use colored::Colorize;
 use inquire::Confirm;
 use inquire::Select;
 use std::fs::File;
+use std::io::ErrorKind::NotFound;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
+use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs, process::exit, str};
+use which::which;
 
 #[derive(Debug)]
 /// Line number style configs
@@ -81,22 +84,45 @@ impl CustomSettings {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct Requirement {
+    base_name: String,
+    aliases: Vec<String>,
+}
+
+impl Requirement {
+    fn new(args: &[&str]) -> Self {
+        let base = args[0].to_owned();
+        let rest = args[1..args.len()]
+            .to_vec()
+            .into_iter()
+            .map(|r| r.to_owned())
+            .collect();
+
+        Self {
+            base_name: base,
+            aliases: rest,
+        }
+    }
+}
+
 #[derive(Debug)]
 /// Struct of all the requirements needed for the installation
 ///
 /// * `req_list`: list of the executables names
 /// * `req_res`: parallel list, true if the executable was found false if it was missing
 struct Requirements {
-    req_list: Vec<String>,
+    os: String,
+    req_list: Vec<Requirement>,
     req_res: Vec<bool>,
 }
 
 impl Requirements {
-    fn new(req_list_in: Vec<&str>) -> Self {
-        let req_list_string: Vec<String> = req_list_in.into_iter().map(|x| x.to_string()).collect();
+    fn new(req_list_in: Vec<Requirement>) -> Self {
         Requirements {
-            req_list: req_list_string.clone(),
-            req_res: vec![false; req_list_string.len()],
+            os: env::consts::OS.to_owned(),
+            req_list: req_list_in.clone(),
+            req_res: vec![false; req_list_in.len()],
         }
     }
 
@@ -106,7 +132,7 @@ impl Requirements {
     /// * `status`: executable status true if found false if missing
     fn set_req(&mut self, exe: &str, status: bool) {
         for (idx, req) in self.req_list.iter().enumerate() {
-            if req == exe {
+            if req.base_name == exe || req.aliases.clone().into_iter().any(|r| r == exe) {
                 self.req_res[idx] = status;
             }
         }
@@ -115,23 +141,48 @@ impl Requirements {
     /// Find the program in the host path
     ///
     /// * `program`: executable name to find
-    fn is_program_in_path(&mut self, program: &str) {
-        if let Ok(path) = env::var("PATH") {
-            for p in path.split(":") {
-                let p_str = format!("{}/{}", p, program);
-                if fs::metadata(p_str).is_ok() {
-                    self.set_req(program, true);
-                    return;
+    fn is_program_in_path(&mut self, program: Requirement) {
+        if self.os == "windows" {
+            let mut req_vec = program.aliases.clone();
+            req_vec.push(program.base_name.clone());
+
+            for req_name in req_vec.clone() {
+                let res = which(req_name);
+                match res {
+                    Ok(_) => {
+                        self.set_req(program.base_name.clone().as_str(), true);
+                        return;
+                    }
+                    Err(_) => {
+                        panic!("Some error checking requirements");
+                    }
+                }
+            }
+            self.set_req(program.base_name.clone().as_str(), false);
+            return;
+        } else {
+            let mut req_vec = program.aliases.clone();
+            req_vec.push(program.base_name.clone());
+
+            for req_name in req_vec.clone() {
+                if let Ok(path) = env::var("PATH") {
+                    for p in path.split(":") {
+                        let p_str = format!("{}/{}", p, req_name);
+                        if fs::metadata(p_str).is_ok() {
+                            self.set_req(program.base_name.clone().as_str(), true);
+                            return;
+                        }
+                    }
                 }
             }
         }
-        self.set_req(program, false);
+        self.set_req(program.base_name.clone().as_str(), false);
     }
 
     /// Check if all the executable listed in `self.req_list` are installed in the machine
     fn check_all_installed(&mut self) {
         for req in self.req_list.clone() {
-            self.is_program_in_path(&req);
+            self.is_program_in_path(req.clone());
         }
     }
 
@@ -139,9 +190,9 @@ impl Requirements {
     fn print_result(&self) {
         for (idx, req) in self.req_list.iter().enumerate() {
             if self.req_res[idx] {
-                println!("{} = {} found!", "OK".green(), req.cyan());
+                println!("{} = {} found!", "OK".green(), req.base_name.cyan());
             } else {
-                println!("{} = {} missing!", "ERR".red(), req.cyan());
+                println!("{} = {} missing!", "ERR".red(), req.base_name.cyan());
             }
         }
     }
@@ -210,6 +261,8 @@ fn print_line_number_style_example() {
 }
 
 fn main() {
+    // let os = env::consts::OS;
+
     let mut installation = false;
     let mut update = false;
     let mut uninstall = false;
@@ -265,7 +318,16 @@ fn start_installation() {
 
     let mut settings: CustomSettings = CustomSettings::new();
 
-    let req_list: Vec<&str> = vec!["nvim", "fzf", "git", "lazygit", "fd", "rg", "node"];
+    let req_list: Vec<Requirement> = vec![
+        Requirement::new(&["nvim"]),
+        Requirement::new(&["fzf"]),
+        Requirement::new(&["git"]),
+        Requirement::new(&["lazygit"]),
+        Requirement::new(&["fd"]),
+        Requirement::new(&["rg"]),
+        Requirement::new(&["node"]),
+        Requirement::new(&["C compiler", "clang", "cc", "gcc", "zig"]),
+    ];
     let mut requirements: Requirements = Requirements::new(req_list);
 
     requirements.check_all_installed();
@@ -277,6 +339,15 @@ fn start_installation() {
     } else {
         println!("\nInstall the missing requirements with your favourite package manager!");
         exit(64);
+    }
+
+    let mut nvim_installation_directory: String;
+    if requirements.os == "windows" {
+        nvim_installation_directory = env::var("LOCALAPPDATA").expect("Failed retriving HOME path");
+        nvim_installation_directory.push_str("/nvim");
+    } else {
+        nvim_installation_directory = env::var("HOME").expect("Failed retriving HOME path");
+        nvim_installation_directory.push_str("/.config/nvim");
     }
 
     let start_installation_ans = Confirm::new("Procede with installation?")
@@ -293,8 +364,6 @@ fn start_installation() {
         }
         Err(_) => panic!("Some error occurred!"),
     }
-
-    // TODO: Add backup of old nvim configuration
 
     println!("\n-----------------------\n");
 
@@ -396,10 +465,10 @@ fn start_installation() {
     match backup_ans {
         Ok(choice) => match choice {
             "Config" => {
-                back_up_config(false);
+                back_up_config(false, nvim_installation_directory.clone());
             }
             "Complete" => {
-                back_up_config(true);
+                back_up_config(true, nvim_installation_directory.clone());
             }
             "Skip" => {
                 println!("Skipping backup phase.")
@@ -418,7 +487,13 @@ fn start_installation() {
     match start_installation_ans {
         Ok(true) => {
             clear_screen();
-            run_installation(is_local, is_ssh, settings);
+            // FIX: Set correct path
+            run_installation(
+                is_local,
+                is_ssh,
+                settings,
+                nvim_installation_directory.clone(),
+            );
         }
         Ok(false) => {
             println!("Exiting...");
@@ -431,15 +506,13 @@ fn start_installation() {
 /// Backup old configuration files
 ///
 /// * `is_complete`: true if backup everything related to nvim
-fn back_up_config(is_complete: bool) {
+fn back_up_config(is_complete: bool, nvim_install_location: String) {
     let since_epoch = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Millennium bug?");
     let ms = since_epoch.as_millis().to_string();
-    let home = env::var("HOME").expect("Failed retriving HOME path");
 
-    let mut config_path = home.clone();
-    config_path.push_str("/.config/nvim");
+    let config_path = nvim_install_location.clone();
     let mut config_path_bak = config_path.clone();
     config_path_bak.push_str(ms.as_str());
     config_path_bak.push_str(".bak");
@@ -452,33 +525,50 @@ fn back_up_config(is_complete: bool) {
         return;
     }
 
-    let mut share_path = home.clone();
-    share_path.push_str("/.local/share/nvim");
-    let mut share_path_bak = share_path.clone();
-    share_path_bak.push_str(ms.as_str());
-    share_path_bak.push_str(".bak");
-    if Path::new(&share_path.clone()).exists() {
-        fs::rename(share_path, share_path_bak).expect("Some error during backup.");
-    }
+    if env::consts::OS == "windows" {
+        let mut path_data = env::var("LOCALAPPDATA").expect("Failed retriving HOME path");
+        path_data.push_str("/nvim-data");
 
-    let mut state_path = home.clone();
-    state_path.push_str("/.local/state/nvim");
-    let mut state_path_bak = state_path.clone();
-    state_path_bak.push_str(ms.as_str());
-    state_path_bak.push_str(".bak");
-    if Path::new(&state_path.clone()).exists() {
-        fs::rename(state_path, state_path_bak).expect("Some error during backup.");
-    }
+        let mut path_data_bak = path_data.clone();
+        path_data_bak.push_str(ms.as_str());
+        path_data_bak.push_str(".bak");
 
-    let mut cache_path = home.clone();
-    cache_path.push_str("/.cache/nvim");
-    let mut cache_path_bak = cache_path.clone();
-    cache_path_bak.push_str(ms.as_str());
-    cache_path_bak.push_str(".bak");
-    if Path::new(&cache_path.clone()).exists() {
-        fs::rename(cache_path, cache_path_bak).expect("Some error during backup.");
-    }
+        if Path::new(&path_data.clone()).exists() {
+            fs::rename(path_data, path_data_bak).expect("Some error during backup.");
+        }
+    } else {
+        //==============
+        // UNIX
+        //==============
+        let home = env::var("HOME").expect("Failed retriving HOME path");
 
+        let mut share_path = home.clone();
+        share_path.push_str("/.local/share/nvim");
+        let mut share_path_bak = share_path.clone();
+        share_path_bak.push_str(ms.as_str());
+        share_path_bak.push_str(".bak");
+        if Path::new(&share_path.clone()).exists() {
+            fs::rename(share_path, share_path_bak).expect("Some error during backup.");
+        }
+
+        let mut state_path = home.clone();
+        state_path.push_str("/.local/state/nvim");
+        let mut state_path_bak = state_path.clone();
+        state_path_bak.push_str(ms.as_str());
+        state_path_bak.push_str(".bak");
+        if Path::new(&state_path.clone()).exists() {
+            fs::rename(state_path, state_path_bak).expect("Some error during backup.");
+        }
+
+        let mut cache_path = home.clone();
+        cache_path.push_str("/.cache/nvim");
+        let mut cache_path_bak = cache_path.clone();
+        cache_path_bak.push_str(ms.as_str());
+        cache_path_bak.push_str(".bak");
+        if Path::new(&cache_path.clone()).exists() {
+            fs::rename(cache_path, cache_path_bak).expect("Some error during backup.");
+        }
+    }
     println!("{} = Complete back up done!", "OK".green());
 }
 
@@ -487,11 +577,17 @@ fn back_up_config(is_complete: bool) {
 /// * `is_local`: Flag true if the installation should be local, false if linked to the remote
 /// * `is_ssh`: Flag true if the cloning is done with SSH, false if it uses HTTP
 /// * `settings`: Settings object with all the customizations
-fn run_installation(is_local: bool, is_ssh: bool, settings: CustomSettings) {
+fn run_installation(
+    is_local: bool,
+    is_ssh: bool,
+    settings: CustomSettings,
+    installation_path: String,
+) {
     let mut path_dir_local_config: String;
-    let mut path_str = env::var("HOME").expect("Failed retriving HOME path");
+    // let mut path_str = env::var("HOME").expect("Failed retriving HOME path");
     // let mut path_str: String = String::from(p).to_owned();
-    path_str.push_str("/.config/nvim");
+    // path_str.push_str("/.config/nvim");
+    let path_str = installation_path.clone();
     clone_repo_to_path(is_ssh, &path_str.clone()[..]);
     println!("{} = repository cloned!", "OK".green());
     path_dir_local_config = path_str.clone();
@@ -499,17 +595,19 @@ fn run_installation(is_local: bool, is_ssh: bool, settings: CustomSettings) {
     if is_local {
         let mut path_git = path_str.clone();
         path_git.push_str("/.git");
-        Command::new("rm")
-            .args(&["-rf", &path_git[..]])
-            .output()
-            .expect("Fail removing .git from cloned repo");
+        fs::remove_dir_all(path_git).expect("Some error removing .git");
+        // Command::new("rm")
+        //     .args(&["-rf", &path_git[..]])
+        //     .output()
+        //     .expect("Fail removing .git from cloned repo");
 
         let mut path_gitignore = path_str.clone();
         path_gitignore.push_str("/.gitignore");
-        Command::new("rm")
-            .args(&["-rf", &path_gitignore[..]])
-            .output()
-            .expect("Fail removing .git from cloned repo");
+        fs::remove_file(path_gitignore).expect("Some error removing .gitignore");
+        // Command::new("rm")
+        //     .args(&["-rf", &path_gitignore[..]])
+        //     .output()
+        //     .expect("Fail removing .git from cloned repo");
 
         println!("{} = repository completely local!", "OK".green());
     }
@@ -578,10 +676,11 @@ fn clone_repo_to_path(ssh: bool, path: &str) {
 ///
 /// * `path`: target path of the directory
 fn create_directory(path: &str) {
-    Command::new("mkdir")
-        .args(&[path])
-        .output()
-        .expect("Some error creating directories");
+    fs::create_dir_all(path).expect("Some error creating directories");
+    // Command::new("mkdir")
+    //     .args(&[path])
+    //     .output()
+    //     .expect("Some error creating directories");
 }
 
 /// Create a file at the specified path and write inside it
