@@ -483,7 +483,6 @@ fn start_installation() {
     match start_installation_ans {
         Ok(true) => {
             clear_screen();
-            // FIX: Set correct path
             run_installation(
                 is_local,
                 is_ssh,
