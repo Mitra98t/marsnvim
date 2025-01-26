@@ -5,6 +5,7 @@ return {
     "hrsh7th/cmp-nvim-lsp",
     { "antosha417/nvim-lsp-file-operations", config = true },
     { "folke/neodev.nvim",                   opts = {} },
+    "ray-x/lsp_signature.nvim",
   },
   opts = {
     inlay_hints = { enabled = true },
@@ -46,6 +47,19 @@ return {
     local cmp_nvim_lsp = require("cmp_nvim_lsp")
 
     local keymap = vim.keymap -- for conciseness
+
+    vim.api.nvim_create_autocmd("LspAttach", {
+      callback = function(args)
+        local bufnr = args.buf
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+        if vim.tbl_contains({ 'null-ls' }, client.name) then -- blacklist lsp
+          return
+        end
+        require("lsp_signature").on_attach({
+          -- ... setup options here ...
+        }, bufnr)
+      end,
+    })
 
     vim.api.nvim_create_autocmd("LspAttach", {
       group = vim.api.nvim_create_augroup("UserLspConfig", {}),

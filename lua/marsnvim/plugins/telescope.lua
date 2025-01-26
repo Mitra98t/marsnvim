@@ -2,6 +2,7 @@ return {
   "nvim-telescope/telescope.nvim",
   branch = "0.1.x",
   dependencies = {
+    "AckslD/nvim-neoclip.lua",
     "nvim-lua/plenary.nvim",
     { "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
     "nvim-tree/nvim-web-devicons",
@@ -26,6 +27,8 @@ return {
 		})
     ]]
     --
+
+    require('neoclip').setup()
 
     local chameleon = require('chameleon')
     telescope.setup({
@@ -119,6 +122,11 @@ return {
         "<leader>fR",
         "<cmd>Telescope file_browser path=%:p:h select_buffer=true<CR>",
         desc = "File browser in current file directory"
+      },
+      {
+        "<leader>fy",
+        "<cmd>Telescope neoclip<CR>",
+        desc = "Find clipboard history"
       }
     })
   end,
