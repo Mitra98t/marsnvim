@@ -7,6 +7,7 @@ return {
     "nvim-tree/nvim-web-devicons",
     "folke/todo-comments.nvim",
     "dimitriosvalodimos/chameleon.nvim",
+    "nvim-telescope/telescope-file-browser.nvim",
   },
   config = function()
     -- local transform_mod = require("telescope.actions.mt").transform_mod
@@ -43,6 +44,10 @@ return {
         }
       },
       extensions = {
+        file_browser = {
+          theme = "dropdown",
+          hijack_netrw = true,
+        },
         chameleon = {
           themes = {
             "everforest",
@@ -87,7 +92,7 @@ return {
       { "<leader>ff",       "<cmd>Telescope find_files<cr>",           desc = "Fuzzy find files in cwd" },
       { "<leader>ut",       "<cmd>Telescope chameleon<cr>",            desc = "Theme switcher" },
       { "<leader><leader>", "<cmd>Telescope find_files<cr>",           desc = "Fuzzy find files in cwd" },
-      { "<leader>fr",       "<cmd>Telescope oldfiles<cr>",             desc = "Fuzzy find recent files" },
+      { "<leader>fo",       "<cmd>Telescope oldfiles<cr>",             desc = "Fuzzy find recent files" },
       { "<leader>fw",       "<cmd>Telescope live_grep<cr>",            desc = "Find word in cwd" },
       { "<leader>ft",       "<cmd>TodoTelescope<cr>",                  desc = "Find todos" },
       { "<leader>fb",       "<cmd>Telescope buffers<cr>",              desc = "Find buffers" },
@@ -105,6 +110,16 @@ return {
         "<cmd>Telescope lsp_references<CR>",
         desc = "Find references of string under cursor"
       },
+      {
+        "<leader>fr",
+        "<cmd>Telescope file_browser<CR>",
+        desc = "File browser"
+      },
+      {
+        "<leader>fR",
+        "<cmd>Telescope file_browser path=%:p:h select_buffer=true<CR>",
+        desc = "File browser in current file directory"
+      }
     })
   end,
 }
